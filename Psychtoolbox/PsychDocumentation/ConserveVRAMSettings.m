@@ -184,6 +184,7 @@
 % system when used with NVidia Geforce 8000 GPU's or later in
 % frame-sequential stereo mode. This will create a very high cpu load and
 % may have negative side effects on system timing. Use as last resort!
+% See also kPsychTripleBufferWorkaround.
 %
 %
 % 65536 (= 2^16) == kPsychDontUseNativeBeamposQuery [Deprecated]
@@ -325,6 +326,20 @@
 % precision. This flag allows to enforce fixed function as a potential plan B.
 % The HighColorPrecisionDrawingTest() script will detect such defective graphics
 % drivers and advice the user to use this flag in such situations.
+%
+%
+% 2^30 == kPsychTripleBufferWorkaround
+% This can be seen as an speed-optimized version of kPsychBusyWaitForVBLBefore-
+% BufferSwapRequest, specifically intended for working around OpenGL triple-
+% buffering in case triple-buffering cannot be disabled in the graphics card
+% driver (e.g. INTEL UHD graphics under Windows, April 2021). It also works
+% around a probably very specific INTEL driver inefficiency which is caused
+% by unnecessary repetitions of OpneGL clear operations that have no other
+% effect than wasting time.
+% Note that when using kPsychBusyWaitForVBLBeforeBufferSwapRequest or this
+% flag for working around triple-buffering, the actual flip will occur (at
+% the graphics card output) regularly one monitor refresh cycle later than
+% indicated by the flip timestamps.
 %
 %
 % --> It's always better to update your graphics drivers with fixed

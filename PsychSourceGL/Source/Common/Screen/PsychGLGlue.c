@@ -228,22 +228,31 @@ void PsychGLClear(PsychWindowRecordType *windowRecord)
 {
     int oldShader, nowShader;
 
-    // Unclamped/High-precision color mode enabled via GLSL shaders?
-    if ((windowRecord->defaultDrawShader != 0) && (windowRecord->defaultDrawShader == windowRecord->unclampedDrawShader)) {
+    // Unclamped/High-precision color mode enabled via GLSL shaders or kPsychTripleBufferWorkaround?
+    if (((windowRecord->defaultDrawShader != 0) && (windowRecord->defaultDrawShader == windowRecord->unclampedDrawShader)) || (PsychPrefStateGet_ConserveVRAM() & kPsychTripleBufferWorkaround)) {
         // Yes. Can't use standard clear, but need to clear via drawing a full-window rect with
-        // clear color:
+        // clear color. The code should be similar to SCREENFillRect(full screen) for when it is
+        // not forwarded to PsychGLClear(). However, if FillRect() does not forward the "full screen"
+        // case to PsychGLClear, it neither takes care of the shader stuff nor blending nor potentially
+        // active GL transformations, all of which we do here.
+        // Regarding kPsychTripleBufferWorkaround, this is a workaround for a weird INTEL UHD graphics driver
+        // behavior (April 2021): Although glClearColor() works, it triggers a second seemingly completely
+        // ineffective clear operation at the next flip (after SwapBuffers()), which just eats up time.
 
         // Query currently bound shader:
         oldShader = PsychGetCurrentShader(windowRecord);
 
-        // Assign hdr draw shader:
+        // Assign hdr draw shader (or disable potentially active shader):
         nowShader = PsychSetShader(windowRecord, -1);
 
-        // Assign HDR clear color for window:
+        // Assign clear color for window (HDR if the unclampedDrawShader is in use, normal color otherwise):
         HDRglColor4dv(windowRecord->clearColor);
+        glColor4dv(windowRecord->clearColor);
 
-        // Draw a fullscreen rect in the clear color, make sure
-        // no alpha blending is active:
+        //--- Draw a fullscreen rect in the clear color.
+        glPushMatrix();
+        glLoadIdentity();
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         if (glIsEnabled(GL_BLEND)) {
             glDisable(GL_BLEND);
             PsychGLRect(windowRecord->rect);
@@ -252,6 +261,12 @@ void PsychGLClear(PsychWindowRecordType *windowRecord)
         else {
             PsychGLRect(windowRecord->rect);
         }
+        glColorMask(windowRecord->colorMask[0], windowRecord->colorMask[1], windowRecord->colorMask[2], windowRecord->colorMask[3]);
+        glPopMatrix();
+
+        // Also set the "official" GL clear color so that glGetXXX(GL_COLOR_CLEAR_VALUE) reflects
+        // the correct color  - not necessarily for within PTB but for the scripts using PTB.
+        glClearColor((GLclampf)windowRecord->clearColor[0], (GLclampf)windowRecord->clearColor[1], (GLclampf)windowRecord->clearColor[2], (GLclampf)windowRecord->clearColor[3]);
 
         // Revert to old shader binding:
         if (nowShader != oldShader) PsychSetShader(windowRecord, oldShader);

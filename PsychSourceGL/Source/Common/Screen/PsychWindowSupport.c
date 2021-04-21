@@ -1475,7 +1475,7 @@ psych_bool PsychOpenOnscreenWindow(PsychScreenSettingsType *screenSettings, Psyc
                 }
 
                 // Is this the 2nd failed trial?
-                if ((ifi_estimate==0) && (retry_count == 2)) {
+                if ((ifi_estimate==0) && (retry_count == 2) && (!(PsychPrefStateGet_ConserveVRAM() & kPsychTripleBufferWorkaround))) {
                     // Yes. Before we start the 3rd and final trial, we enable manual syncing of bufferswaps
                     // to retrace by setting the kPsychBusyWaitForVBLBeforeBufferSwapRequest flag for this window.
                     // Our PsychOSFlipWindowBuffers() routine will spin-wait/busy-wait manually for onset of VBL
@@ -3835,7 +3835,7 @@ double PsychFlipWindowBuffers(PsychWindowRecordType *windowRecord, int multiflip
     }
     else {
         // Need to sync the pipeline, if this special workaround is active to get good timing:
-        if ((PsychPrefStateGet_ConserveVRAM() & kPsychBusyWaitForVBLBeforeBufferSwapRequest) || (windowRecord->specialflags & kPsychBusyWaitForVBLBeforeBufferSwapRequest)) {
+        if ((PsychPrefStateGet_ConserveVRAM() & (kPsychBusyWaitForVBLBeforeBufferSwapRequest | kPsychTripleBufferWorkaround)) || (windowRecord->specialflags & kPsychBusyWaitForVBLBeforeBufferSwapRequest)) {
             glFinish();
 
             // Pipeline flush done by glFinish(), avoid redundant pipeline flushes:
@@ -3868,6 +3868,10 @@ double PsychFlipWindowBuffers(PsychWindowRecordType *windowRecord, int multiflip
         // Yes. Map it to swapflags: 0/1 maps to 1/2 aka even/odd frame:
         targetSwapFlags |= (windowRecord->targetFlipFieldType == 0) ? 1 : 2;
     }
+
+    // No need for 'min_line_allowed' if the workaround is used.
+    if (PsychPrefStateGet_ConserveVRAM() & kPsychTripleBufferWorkaround)
+        min_line_allowed = 0;
 
     // Get reference time:
     PsychGetAdjustedPrecisionTimerSeconds(&tremaining);
@@ -4187,7 +4191,7 @@ double PsychFlipWindowBuffers(PsychWindowRecordType *windowRecord, int multiflip
             // At return of the method, we know that the swap has completed.
             if (verbosity > 10) printf("PTB-DEBUG:PsychOSGetSwapCompletionTimestamp() success: swap_msc = %lld, tSwapComplete = %lf secs.\n", swap_msc, tSwapComplete);
         }
-        else {
+        else if (!(PsychPrefStateGet_ConserveVRAM() & kPsychTripleBufferWorkaround)) {
             // OS-Builtin timestamping failed, is unsupported, or it is disabled by usercode.
             if ((swap_msc < -1) && (verbosity > 1)) {
                 printf("PTB-WARNING:PsychOSGetSwapCompletionTimestamp() FAILED: errorcode = %lld, tSwapComplete = %lf.\n", swap_msc, tSwapComplete);
@@ -7776,7 +7780,7 @@ void PsychExecuteBufferSwapPrefix(PsychWindowRecordType *windowRecord)
     PsychStoreGPUSurfaceAddresses(windowRecord);
 
     // Workaround for broken sync-bufferswap-to-VBL support needed?
-    if ((windowRecord->specialflags & kPsychBusyWaitForVBLBeforeBufferSwapRequest) || (PsychPrefStateGet_ConserveVRAM() & kPsychBusyWaitForVBLBeforeBufferSwapRequest)) {
+    if ((windowRecord->specialflags & kPsychBusyWaitForVBLBeforeBufferSwapRequest) || (PsychPrefStateGet_ConserveVRAM() & (kPsychBusyWaitForVBLBeforeBufferSwapRequest | kPsychTripleBufferWorkaround))) {
         // Yes: Sync of bufferswaps to VBL requested?
         if (windowRecord->vSynced) {
             // Sync of bufferswaps to retrace requested:
@@ -7796,6 +7800,8 @@ void PsychExecuteBufferSwapPrefix(PsychWindowRecordType *windowRecord)
                 // Zero scanout position. Could be sign of a failure, or just that we happened zero
                 // by chance. Wait  250 usecs and retry. If it is still zero, we know this is a
                 // permanent failure condition.
+                // If kPsychTripleBufferWorkaround, the zero scanout position is considered (still) fine though.
+                if (PsychPrefStateGet_ConserveVRAM() & kPsychTripleBufferWorkaround) return;
                 PsychWaitIntervalSeconds(0.000250);
                 lastline = (long) PsychGetDisplayBeamPosition(cgDisplayID, windowRecord->screenNumber);
             }

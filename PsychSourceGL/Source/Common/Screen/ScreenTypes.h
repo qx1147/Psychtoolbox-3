@@ -264,6 +264,9 @@ typedef struct {
 // Skip wait until scanout out-of-vblank before issuing swaprequest:
 #define kPsychSkipOutOfVblankWait (1 << 29)
 
+// Work around triple-buffering and probably related glClear() issue (Intel UHD driver, Windows)
+#define kPsychTripleBufferWorkaround (1 << 30)
+
 //function protoptypes
 
 //Accessors for PsychDepthType

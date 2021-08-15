@@ -141,6 +141,12 @@ PsychError SCREENTransformTexture(void)
 
         // Assign parent window and copy its inheritable properties:
         PsychAssignParentWindow(targetRecord, sourceRecord);
+        // Make the target a sibling of the source rather than a child, so that the source texture
+        // can be released afterwards without leaving the target texture dangling, i.e., 
+        // without leaving the parentWindow element referencing a potentially released
+        // texture, which can crash Matlab whenever the reference is going to be used, 
+        // e.g. in PsychGetParentWindow().
+        targetRecord->parentWindow = sourceRecord->parentWindow;
 
         targetRecord->depth = sourceRecord->depth;
 

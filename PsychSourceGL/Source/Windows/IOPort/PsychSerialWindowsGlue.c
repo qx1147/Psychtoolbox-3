@@ -399,6 +399,7 @@ PsychSerialDeviceRecord* PsychIOOSOpenSerialPort(const char* portSpec, const cha
     device->fileDescriptor = INVALID_HANDLE_VALUE;
     device->readBuffer = NULL;
     device->readBufferSize = 0;
+    device->breakBehaviour = 0;
 
     // Get the current options and save them so we can restore the default settings later.
     device->OriginalTTYAttrs.DCBlength = sizeof(DCB);
@@ -761,6 +762,22 @@ PsychError PsychIOOSConfigureSerialPort( PsychSerialDeviceRecord* device, const 
     //        }
     //        updatetermios = TRUE;
     //    }
+
+    // Handling of Break condition:
+    if ((p = strstr(configString, "BreakBehaviour="))) {
+        device->breakBehaviour = 0;
+        if (strstr(p, "BreakBehaviour=IgnoreEarly")) {
+            device->breakBehaviour = 1;
+        }
+        else if (strstr(p, "BreakBehaviour=Ignore")) {
+            device->breakBehaviour = 0;
+        }
+        else {
+            // Invalid spec:
+            if (verbosity > 0) printf("Invalid setting for break behaviour %s not accepted! (Valid: Ignore, IgnoreEarly)\n", p);
+            return(PsychError_user);
+        }
+    }
 
     // Handling of data bits:
     if ((p = strstr(configString, "DataBits="))) {
@@ -1385,6 +1402,10 @@ int PsychIOOSCheckError(PsychSerialDeviceRecord* device, char* inerrmsg)
         if (verbosity > 0) printf("Error during ClearCommError() on device %s returned (%d)\n", device->portSpec, GetLastError());
         if (inerrmsg) sprintf(inerrmsg, "Error during ClearCommError() on device %s returned (%d)\n", device->portSpec, GetLastError());
         return(0xdeadbeef);
+    }
+
+    if ((estatus & CE_BREAK) && device->breakBehaviour==1) {
+        estatus &= ~CE_BREAK;
     }
 
     if (estatus > 0 && inerrmsg) {

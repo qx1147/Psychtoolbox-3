@@ -105,7 +105,7 @@ function [T_quantalAbsorptionsNormalized,T_quantalAbsorptions,T_quantalIsomeriza
 %                                     but useful to have in adjIndDiffParams as
 %                                     well, sometimes.
 %   adjIndDiffParams.ISdiameter - Inner segment diameter estimate (in microns), taken from
-%                                    FillInPhotoreceptors return value.
+%                                    FillInPhotoreceptors return structure.
 %
 % For both adjIndDiffParams.mac and adjIndDiffParams.lens, the wavelength
 % spacing is the same as in the S input variable of this function.
